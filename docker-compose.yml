@@ -1,0 +1,93 @@
+version: "3.9"
+
+networks:
+  forgeops-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: forgeops-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: forgeops
+      POSTGRES_USER: forgeops
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-forgeops_secret}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - forgeops-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forgeops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: forgeops-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_secret}
+    volumes:
+      - redis-data:/data
+    networks:
+      - forgeops-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "--pass", "${REDIS_PASSWORD:-redis_secret}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  forgeops-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: forgeops-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/forgeops
+      SPRING_DATASOURCE_USERNAME: forgeops
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-forgeops_secret}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      FORGEOPS_JWT_SECRET: ${JWT_SECRET:-change_me_in_production_very_long_secret_key}
+      FORGEOPS_JWT_EXPIRY: 86400
+      FORGEOPS_VAULT_ENCRYPTION_KEY: ${VAULT_ENCRYPTION_KEY:-change_me_vault_key_32chars}
+      FORGEOPS_ENGINE_FORK_FACTOR: 10
+      FORGEOPS_ENGINE_TASK_TIMEOUT: 300
+      FORGEOPS_ENGINE_SSH_CONNECT_TIMEOUT: 10
+      FORGEOPS_ENGINE_SSH_STRICT_HOST_CHECK: "false"
+      FORGEOPS_DRIFT_SCHEDULER_ENABLED: "true"
+      FORGEOPS_CORS_ORIGINS: "http://localhost:3000"
+      LOGGING_LEVEL_EU_FORGEOPS: INFO
+    ports:
+      - "8080:8080"
+    networks:
+      - forgeops-net
+
+  forgeops-ui:
+    build:
+      context: ui/
+      dockerfile: Dockerfile.ui
+    container_name: forgeops-ui
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:8080/api/v1
+      VITE_WS_URL: ws://localhost:8080/ws
+    ports:
+      - "3000:80"
+    networks:
+      - forgeops-net
+    depends_on:
+      - forgeops-api

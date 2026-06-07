@@ -1,0 +1,17 @@
+# Build stage
+FROM eclipse-temurin:21-jdk-alpine AS build
+WORKDIR /app
+RUN apk add --no-cache maven
+COPY pom.xml .
+RUN mvn dependency:go-offline -q
+COPY src src
+RUN mvn package -DskipTests -q
+
+# Runtime stage
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+RUN addgroup -S forgeops && adduser -S forgeops -G forgeops
+COPY --from=build /app/target/*.jar app.jar
+USER forgeops
+EXPOSE 8080
+ENTRYPOINT ["java", "-XX:+UseZGC", "-jar", "app.jar"]

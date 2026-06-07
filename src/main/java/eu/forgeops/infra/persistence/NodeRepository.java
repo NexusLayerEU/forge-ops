@@ -31,4 +31,7 @@ public interface NodeRepository extends JpaRepository<Node, UUID> {
 
     @Query("SELECT n FROM Node n JOIN n.groups g WHERE g.id = :groupId")
     List<Node> findAllByGroupId(@Param("groupId") UUID groupId);
+
+    @Query("SELECT DISTINCT n FROM Node n LEFT JOIN FETCH n.variables LEFT JOIN FETCH n.groups g LEFT JOIN FETCH g.variables WHERE n.id IN :ids")
+    List<Node> findAllWithDetailsByIdIn(@Param("ids") List<UUID> ids);
 }

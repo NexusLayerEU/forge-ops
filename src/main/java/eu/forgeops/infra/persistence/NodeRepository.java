@@ -34,4 +34,7 @@ public interface NodeRepository extends JpaRepository<Node, UUID> {
 
     @Query("SELECT DISTINCT n FROM Node n LEFT JOIN FETCH n.variables LEFT JOIN FETCH n.groups g LEFT JOIN FETCH g.variables WHERE n.id IN :ids")
     List<Node> findAllWithDetailsByIdIn(@Param("ids") List<UUID> ids);
+
+    @Query("SELECT DISTINCT n.id FROM Node n JOIN n.groups g JOIN ForgeGroupBinding b ON b.group.id = g.id WHERE b.forge.id = :forgeId")
+    List<UUID> findNodeIdsByForgeId(@Param("forgeId") UUID forgeId);
 }

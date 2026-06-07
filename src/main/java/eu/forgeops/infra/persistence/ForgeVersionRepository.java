@@ -15,4 +15,6 @@ public interface ForgeVersionRepository extends JpaRepository<ForgeVersion, UUID
 
     @Query("SELECT MAX(fv.version) FROM ForgeVersion fv WHERE fv.forge.id = :forgeId")
     Optional<Integer> findMaxVersionByForgeId(@Param("forgeId") UUID forgeId);
+
+    Optional<ForgeVersion> findTopByForgeIdOrderByVersionDesc(UUID forgeId);
 }
